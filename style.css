@@ -48,7 +48,7 @@ header h1 {
   display: block;
   width: 100%;
   padding: 1.2rem;
-  margin: 0 0 1.5rem;
+  margin: 0 0 0.75rem;
   font-size: 1.15rem;
   font-weight: 600;
   background: linear-gradient(135deg, #0ea5e9, #0284c7);
@@ -63,6 +63,65 @@ header h1 {
 .big-button:hover  { opacity: 0.9; }
 .big-button:active { transform: scale(0.98); }
 
+/* Second button — outlined style so it looks secondary */
+.secondary-button {
+  background: transparent;
+  border: 2px solid #334155;
+  color: #94a3b8;
+  box-shadow: none;
+  margin-bottom: 1.5rem;
+}
+
+.secondary-button:hover {
+  border-color: #38bdf8;
+  color: #38bdf8;
+  opacity: 1;
+}
+
+/* ── Registration lookup form ─────────────────────────────── */
+#lookupForm {
+  margin-bottom: 1.25rem;
+}
+
+.lookup-input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Text box where you type the registration */
+.reg-input {
+  flex: 1;
+  padding: 0.85rem 1rem;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  color: #e2e8f0;
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.reg-input::placeholder { color: #475569; text-transform: none; }
+.reg-input:focus { border-color: #38bdf8; }
+
+/* Search button next to the input */
+.reg-search-btn {
+  padding: 0.85rem 1.2rem;
+  background: #0ea5e9;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.reg-search-btn:hover { background: #0284c7; }
+
 /* ── Photo preview ────────────────────────────────────────── */
 #previewSection {
   margin-bottom: 1rem;
@@ -76,6 +135,16 @@ header h1 {
   object-fit: contain;
   border: 2px solid #1e293b;
 }
+
+/* Small credit line under Planespotters images */
+.photo-credit {
+  font-size: 0.72rem;
+  color: #475569;
+  text-align: center;
+  margin-top: 0.4rem;
+}
+
+.photo-credit a { color: #64748b; text-decoration: underline; }
 
 /* ── Spinner ──────────────────────────────────────────────── */
 #loadingSection {

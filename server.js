@@ -21,9 +21,11 @@ app.get('/', (req, res) => {
 });
 
 // ── Helper: call the Anthropic API ───────────────────────────
-function askClaude(imageBase64, mediaType) {
+// Pass imageBase64 + mediaType for photo mode.
+// Pass registration (and null for the others) for lookup mode.
+function askClaude(imageBase64, mediaType, registration) {
   const systemPrompt = `You are an expert aircraft identification system.
-When shown a photo, you MUST respond with ONLY valid JSON — no explanation, no prose, no markdown code fences.
+You MUST respond with ONLY valid JSON — no explanation, no prose, no markdown code fences.
 Return exactly this structure (fill in every field):
 {
   "aircraft_type": "e.g. Boeing 737-800",
@@ -39,24 +41,29 @@ Return exactly this structure (fill in every field):
   "confidence": 0.92,
   "tail_number": "N12345 or empty string if not visible"
 }
-If the image does not appear to contain an aircraft, still return the JSON but set confidence to 0 and use "Unknown" for text fields and 0 for numbers.`;
+If the aircraft cannot be identified, set confidence to 0 and use "Unknown" for text fields and 0 for numbers.`;
+
+  // Build the user message differently depending on mode
+  let userContent;
+  if (registration) {
+    // Registration lookup mode — text only, no image
+    userContent = `What aircraft has the registration ${registration}? Return specs as JSON only.`;
+  } else {
+    // Photo identification mode — send image + text
+    userContent = [
+      {
+        type: 'image',
+        source: { type: 'base64', media_type: mediaType || 'image/jpeg', data: imageBase64 },
+      },
+      { type: 'text', text: 'What aircraft is in this photo? Respond with JSON only.' },
+    ];
+  }
 
   const requestBody = JSON.stringify({
     model: 'claude-sonnet-4-6',
     max_tokens: 1024,
     system: systemPrompt,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: mediaType || 'image/jpeg', data: imageBase64 },
-          },
-          { type: 'text', text: 'What aircraft is in this photo? Respond with JSON only.' },
-        ],
-      },
-    ],
+    messages: [{ role: 'user', content: userContent }],
   });
 
   const options = {
@@ -157,8 +164,8 @@ app.post('/api/identify', async (req, res) => {
   if (!process.env.ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not set in .env' });
 
   try {
-    // Step 1: Ask Claude to identify the aircraft
-    const planeData = await askClaude(imageBase64, mediaType);
+    // Step 1: Ask Claude to identify the aircraft from the photo
+    const planeData = await askClaude(imageBase64, mediaType, null);
 
     // Step 2: If a tail number was spotted, look up live flight data
     const hasTailNumber = planeData.tail_number && planeData.tail_number.trim() !== '';
@@ -173,6 +180,66 @@ app.post('/api/identify', async (req, res) => {
     planeData.flight = flightData;
     res.json(planeData);
 
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Helper: fetch a photo from Planespotters.net ──────────────
+function getPhoto(registration) {
+  const cleanReg = registration.trim().toUpperCase();
+  const options = {
+    hostname: 'api.planespotters.net',
+    path: `/pub/photos/reg/${encodeURIComponent(cleanReg)}`,
+    method: 'GET',
+    headers: { 'User-Agent': 'PlaneSpotter-App/1.0' },
+  };
+  return new Promise((resolve) => {
+    const req = https.request(options, (response) => {
+      let rawData = '';
+      response.on('data', (chunk) => { rawData += chunk; });
+      response.on('end', () => {
+        try {
+          const parsed = JSON.parse(rawData);
+          if (parsed.photos && parsed.photos.length > 0) {
+            const photo = parsed.photos[0];
+            resolve({
+              imageUrl:     photo.thumbnail_large ? photo.thumbnail_large.src : photo.thumbnail.src,
+              photographer: photo.photographer || 'Unknown',
+              link:         photo.link || 'https://www.planespotters.net',
+            });
+          } else { resolve(null); }
+        } catch (e) { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
+
+// ── Route: POST /api/lookup ───────────────────────────────────
+app.post('/api/lookup', async (req, res) => {
+  const { registration } = req.body;
+  if (!registration || !registration.trim()) return res.status(400).json({ error: 'No registration provided' });
+  if (!process.env.ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not set' });
+
+  try {
+    const cleanReg = registration.trim().toUpperCase();
+
+    // Ask Claude for specs and fetch photo simultaneously
+    const [planeData, photoData] = await Promise.all([
+      askClaude(null, null, cleanReg),   // special registration-only mode
+      getPhoto(cleanReg),
+    ]);
+
+    planeData.tail_number = cleanReg;
+
+    let flightData = null;
+    if (process.env.FLIGHTAWARE_API_KEY) {
+      flightData = await getFlightData(cleanReg);
+    }
+
+    res.json({ ...planeData, flight: flightData, photo: photoData });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -27,20 +27,42 @@
         style="display: none;"
       />
 
-      <!-- Big visible button -->
+      <!-- Button 1: identify from photo -->
       <button id="identifyBtn" class="big-button">
         📷 Identify a Plane
       </button>
 
-      <!-- Photo preview -->
+      <!-- Button 2: look up by registration -->
+      <button id="lookupBtn" class="big-button secondary-button">
+        🔍 Look Up by Registration
+      </button>
+
+      <!-- Registration lookup form (hidden until button 2 is clicked) -->
+      <div id="lookupForm" class="hidden">
+        <div class="lookup-input-row">
+          <input
+            type="text"
+            id="regInput"
+            class="reg-input"
+            placeholder="e.g. C-GWFM or G-BOAC"
+            maxlength="10"
+            autocomplete="off"
+            autocapitalize="characters"
+          />
+          <button id="regSearchBtn" class="reg-search-btn">Search</button>
+        </div>
+      </div>
+
+      <!-- Photo / aircraft image preview -->
       <div id="previewSection" class="hidden">
-        <img id="previewImage" src="" alt="Your photo" />
+        <img id="previewImage" src="" alt="Aircraft photo" />
+        <p id="photoCredit" class="photo-credit hidden"></p>
       </div>
 
       <!-- Loading spinner -->
       <div id="loadingSection" class="hidden">
         <div class="spinner"></div>
-        <p>Analysing aircraft…</p>
+        <p id="loadingText">Analysing aircraft…</p>
       </div>
 
       <!-- Error message box -->
@@ -49,7 +71,7 @@
         <button id="tryAgainBtn" class="try-again-btn">Try Again</button>
       </div>
 
-      <!-- Low confidence warning (not sure it's a plane) -->
+      <!-- Low confidence warning -->
       <div id="lowConfidenceSection" class="hidden">
         <p class="low-confidence-icon">🤔</p>
         <p id="lowConfidenceMessage"></p>
@@ -59,7 +81,6 @@
       <!-- Results card -->
       <div id="resultsCard" class="hidden">
 
-        <!-- Aircraft name and role -->
         <div class="result-header">
           <h2 id="aircraftName"></h2>
           <p id="roleText" class="role"></p>
@@ -91,7 +112,7 @@
           </tbody>
         </table>
 
-        <!-- Live Flight section — shown only when FlightAware returns data -->
+        <!-- Live Flight section -->
         <div id="flightSection" class="hidden">
           <div class="flight-header">
             <span class="flight-dot"></span>
@@ -99,16 +120,15 @@
           </div>
           <table class="specs-table">
             <tbody>
-              <tr><th>Flight</th>      <td id="flightNumber"></td></tr>
-              <tr><th>From</th>        <td id="flightOrigin"></td></tr>
-              <tr><th>To</th>          <td id="flightDestination"></td></tr>
-              <tr><th>Departed</th>    <td id="flightDeparture"></td></tr>
-              <tr><th>Status</th>      <td id="flightStatus"></td></tr>
+              <tr><th>Flight</th>    <td id="flightNumber"></td></tr>
+              <tr><th>From</th>      <td id="flightOrigin"></td></tr>
+              <tr><th>To</th>        <td id="flightDestination"></td></tr>
+              <tr><th>Departed</th>  <td id="flightDeparture"></td></tr>
+              <tr><th>Status</th>    <td id="flightStatus"></td></tr>
             </tbody>
           </table>
         </div>
 
-        <!-- Shown when tail number was found but no flight data available -->
         <div id="noFlightSection" class="hidden">
           <p class="no-flight-msg">📡 No recent flight found for this registration.</p>
         </div>
@@ -118,13 +138,11 @@
     </main>
 
     <!-- ── History section ──────────────────────── -->
-    <!-- This sits below main and shows past identifications -->
     <section id="historySection" class="hidden">
       <div class="history-header">
         <h3>Recent Identifications</h3>
         <button id="clearHistoryBtn" class="clear-btn">Clear</button>
       </div>
-      <!-- History items are injected here by script.js -->
       <div id="historyGrid"></div>
     </section>
 

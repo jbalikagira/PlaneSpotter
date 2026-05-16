@@ -1,18 +1,19 @@
 // ============================================================
-// PlaneSpotter — script.js  (Phase 3)
-// New in this version:
-//   - localStorage history (save + display past identifications)
-//   - Low confidence warning instead of showing bad results
-//   - Better error messages (offline detection, etc.)
-//   - Try Again button resets the UI
+// PlaneSpotter — script.js  (Phase 3 + Registration Lookup)
 // ============================================================
 
 // ── Grab all HTML elements we'll touch ───────────────────────
 const identifyBtn          = document.getElementById('identifyBtn');
 const imageInput           = document.getElementById('imageInput');
+const lookupBtn            = document.getElementById('lookupBtn');
+const lookupForm           = document.getElementById('lookupForm');
+const regInput             = document.getElementById('regInput');
+const regSearchBtn         = document.getElementById('regSearchBtn');
 const previewSection       = document.getElementById('previewSection');
 const previewImage         = document.getElementById('previewImage');
+const photoCredit          = document.getElementById('photoCredit');
 const loadingSection       = document.getElementById('loadingSection');
+const loadingText          = document.getElementById('loadingText');
 const errorSection         = document.getElementById('errorSection');
 const errorMessage         = document.getElementById('errorMessage');
 const lowConfidenceSection = document.getElementById('lowConfidenceSection');
@@ -38,32 +39,54 @@ const specConfidence   = document.getElementById('specConfidence');
 const confidenceBar    = document.getElementById('confidenceBar');
 
 // Live flight elements
-const flightSection    = document.getElementById('flightSection');
-const noFlightSection  = document.getElementById('noFlightSection');
-const flightNumber     = document.getElementById('flightNumber');
-const flightOrigin     = document.getElementById('flightOrigin');
-const flightDestination= document.getElementById('flightDestination');
-const flightDeparture  = document.getElementById('flightDeparture');
-const flightStatus     = document.getElementById('flightStatus');
+const flightSection     = document.getElementById('flightSection');
+const noFlightSection   = document.getElementById('noFlightSection');
+const flightNumber      = document.getElementById('flightNumber');
+const flightOrigin      = document.getElementById('flightOrigin');
+const flightDestination = document.getElementById('flightDestination');
+const flightDeparture   = document.getElementById('flightDeparture');
+const flightStatus      = document.getElementById('flightStatus');
 
 // ── Constants ─────────────────────────────────────────────────
-// If Claude is less than 50% confident, we show a warning instead of results
 const LOW_CONFIDENCE_THRESHOLD = 0.50;
+const HISTORY_KEY  = 'planespotter_history';
+const MAX_HISTORY  = 20;
 
-// Key we use to store history in localStorage
-const HISTORY_KEY = 'planespotter_history';
-
-// Maximum number of history items to keep
-const MAX_HISTORY = 20;
-
-// ── On page load: show any saved history ─────────────────────
+// ── On page load ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   renderHistory();
 });
 
-// ── Button click → open file picker / camera ─────────────────
+// ── Button 1: open camera / file picker ──────────────────────
 identifyBtn.addEventListener('click', () => {
+  // Hide the lookup form if it was open
+  hide(lookupForm);
   imageInput.click();
+});
+
+// ── Button 2: toggle the registration lookup form ────────────
+lookupBtn.addEventListener('click', () => {
+  const isVisible = !lookupForm.classList.contains('hidden');
+  if (isVisible) {
+    hide(lookupForm);
+  } else {
+    show(lookupForm);
+    regInput.focus(); // put the cursor straight in the box
+  }
+});
+
+// ── Search button inside lookup form ─────────────────────────
+regSearchBtn.addEventListener('click', () => {
+  const reg = regInput.value.trim();
+  if (reg) lookupByRegistration(reg);
+});
+
+// Also allow pressing Enter in the input box
+regInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const reg = regInput.value.trim();
+    if (reg) lookupByRegistration(reg);
+  }
 });
 
 // ── "Try Again" buttons → reset the UI ───────────────────────
@@ -150,6 +173,68 @@ async function identifyPlane(file) {
       friendlyMessage = 'Could not reach the server. Are you offline, or is the server running?';
     }
 
+    showError(friendlyMessage);
+  }
+}
+
+// ── Registration lookup function ─────────────────────────────
+async function lookupByRegistration(registration) {
+  hide(resultsCard);
+  hide(errorSection);
+  hide(lowConfidenceSection);
+  hide(previewSection);
+  show(loadingSection);
+  loadingText.textContent = `Looking up ${registration.toUpperCase()}…`;
+
+  try {
+    if (!navigator.onLine) {
+      throw new Error('You appear to be offline. Please check your internet connection.');
+    }
+
+    const response = await fetch('/api/lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ registration }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Server returned an error. Please try again.');
+    }
+
+    hide(loadingSection);
+    loadingText.textContent = 'Analysing aircraft…'; // reset for next time
+
+    // If a photo came back from Planespotters, show it
+    if (data.photo && data.photo.imageUrl) {
+      previewImage.src = data.photo.imageUrl;
+      // Show photo credit
+      photoCredit.innerHTML = `Photo by ${data.photo.photographer} via <a href="${data.photo.link}" target="_blank" rel="noopener">Planespotters.net</a>`;
+      show(previewSection);
+      show(photoCredit);
+    } else {
+      // No photo found — hide preview
+      hide(previewSection);
+    }
+
+    // Show results (same card as photo identification)
+    showResults(data);
+
+    // Save to history using the Planespotters image as thumbnail (or a placeholder)
+    const thumbnailUrl = data.photo ? data.photo.imageUrl : null;
+    if (thumbnailUrl) {
+      saveToHistory(data, thumbnailUrl);
+      renderHistory();
+    }
+
+  } catch (err) {
+    hide(loadingSection);
+    loadingText.textContent = 'Analysing aircraft…';
+    let friendlyMessage = err.message;
+    if (err.message.includes('fetch') || err.message.includes('Failed to fetch')) {
+      friendlyMessage = 'Could not reach the server. Are you offline, or is the server running?';
+    }
     showError(friendlyMessage);
   }
 }
@@ -286,6 +371,7 @@ function resetUI() {
   hide(resultsCard);
   hide(previewSection);
   hide(loadingSection);
+  hide(photoCredit);
 }
 
 // ── localStorage history helpers ──────────────────────────────

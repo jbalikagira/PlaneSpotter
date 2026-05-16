@@ -2,6 +2,7 @@
   "version": 2,
   "routes": [
     { "src": "/api/identify", "dest": "/api/identify.js" },
+    { "src": "/api/lookup",   "dest": "/api/lookup.js" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
