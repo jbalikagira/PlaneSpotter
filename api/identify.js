@@ -1,8 +1,9 @@
 // ============================================================
-// api/identify.js
-// This file is a Vercel Serverless Function.
-// On Vercel, requests to /api/identify are handled here.
-// Locally, server.js handles /api/identify instead.
+// api/identify.js  (Phase 3)
+// Vercel Serverless Function.
+// Step 1: Ask Claude what plane it is.
+// Step 2: If a tail number is visible, ask FlightAware for live flight data.
+// Step 3: Send everything back to the browser.
 // ============================================================
 
 require('dotenv').config();
@@ -17,22 +18,9 @@ module.exports.config = {
   },
 };
 
-module.exports = async (req, res) => {
-  // Only allow POST requests
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const { imageBase64, mediaType } = req.body;
-
-  if (!imageBase64) {
-    return res.status(400).json({ error: 'No image data received' });
-  }
-
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not set' });
-  }
-
+// ── Helper: call the Anthropic API ───────────────────────────
+// Returns the parsed plane data object from Claude.
+function askClaude(imageBase64, mediaType) {
   const systemPrompt = `You are an expert aircraft identification system.
 When shown a photo, you MUST respond with ONLY valid JSON — no explanation, no prose, no markdown code fences.
 Return exactly this structure (fill in every field):
@@ -68,10 +56,7 @@ If the image does not appear to contain an aircraft, still return the JSON but s
               data: imageBase64,
             },
           },
-          {
-            type: 'text',
-            text: 'What aircraft is in this photo? Respond with JSON only.',
-          },
+          { type: 'text', text: 'What aircraft is in this photo? Respond with JSON only.' },
         ],
       },
     ],
@@ -89,25 +74,21 @@ If the image does not appear to contain an aircraft, still return the JSON but s
     },
   };
 
-  return new Promise((resolve) => {
-    const anthropicRequest = https.request(options, (anthropicResponse) => {
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (response) => {
       let rawData = '';
-
-      anthropicResponse.on('data', (chunk) => { rawData += chunk; });
-
-      anthropicResponse.on('end', () => {
+      response.on('data', (chunk) => { rawData += chunk; });
+      response.on('end', () => {
         try {
           const parsed = JSON.parse(rawData);
 
           if (parsed.type === 'error') {
             const msg = parsed.error && parsed.error.message ? parsed.error.message : 'Unknown API error';
-            res.status(500).json({ error: `Anthropic API error: ${msg}` });
-            return resolve();
+            return reject(new Error(`Anthropic API error: ${msg}`));
           }
 
           if (!parsed.content || !parsed.content[0] || !parsed.content[0].text) {
-            res.status(500).json({ error: 'Unexpected response from Claude', raw: parsed });
-            return resolve();
+            return reject(new Error('Unexpected response shape from Claude'));
           }
 
           const claudeText = parsed.content[0].text;
@@ -120,27 +101,112 @@ If the image does not appear to contain an aircraft, still return the JSON but s
             if (match) {
               planeData = JSON.parse(match[0]);
             } else {
-              res.status(500).json({ error: 'Claude did not return valid JSON', raw: claudeText });
-              return resolve();
+              return reject(new Error('Claude did not return valid JSON'));
             }
           }
 
-          res.json(planeData);
-          resolve();
-
+          resolve(planeData);
         } catch (err) {
-          res.status(500).json({ error: 'Failed to parse response', details: err.message });
-          resolve();
+          reject(new Error('Failed to parse Claude response: ' + err.message));
         }
       });
     });
 
-    anthropicRequest.on('error', (err) => {
-      res.status(500).json({ error: 'Network error calling Anthropic API', details: err.message });
-      resolve();
+    req.on('error', (err) => reject(new Error('Network error: ' + err.message)));
+    req.write(requestBody);
+    req.end();
+  });
+}
+
+// ── Helper: call FlightAware AeroAPI ─────────────────────────
+// Returns a flight info object, or null if nothing found.
+function getFlightData(tailNumber) {
+  // Remove spaces and make uppercase (e.g. "C-GWFM" stays "C-GWFM")
+  const ident = tailNumber.trim().toUpperCase();
+
+  const options = {
+    hostname: 'aeroapi.flightaware.com',
+    path: `/aeroapi/flights/${encodeURIComponent(ident)}`,
+    method: 'GET',
+    headers: {
+      'x-apikey': process.env.FLIGHTAWARE_API_KEY,
+    },
+  };
+
+  return new Promise((resolve) => {
+    const req = https.request(options, (response) => {
+      let rawData = '';
+      response.on('data', (chunk) => { rawData += chunk; });
+      response.on('end', () => {
+        try {
+          const parsed = JSON.parse(rawData);
+
+          // FlightAware returns a "flights" array — use the most recent one (index 0)
+          if (parsed.flights && parsed.flights.length > 0) {
+            const f = parsed.flights[0];
+
+            resolve({
+              origin:         f.origin      ? `${f.origin.city} (${f.origin.code_iata || f.origin.code})` : 'Unknown',
+              destination:    f.destination ? `${f.destination.city} (${f.destination.code_iata || f.destination.code})` : 'Unknown',
+              // Use actual departure time if available, otherwise scheduled
+              departure_time: f.actual_out  || f.scheduled_out || null,
+              status:         f.status      || 'Unknown',
+              flight_number:  f.ident       || ident,
+            });
+          } else {
+            // No flights found for this tail number
+            resolve(null);
+          }
+        } catch (e) {
+          // Parse error — treat as no flight found
+          resolve(null);
+        }
+      });
     });
 
-    anthropicRequest.write(requestBody);
-    anthropicRequest.end();
+    // Network error — treat as no flight found (don't crash the whole response)
+    req.on('error', () => resolve(null));
+    req.end();
   });
+}
+
+// ── Main handler ──────────────────────────────────────────────
+module.exports = async (req, res) => {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { imageBase64, mediaType } = req.body;
+
+  if (!imageBase64) {
+    return res.status(400).json({ error: 'No image data received' });
+  }
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not set' });
+  }
+
+  try {
+    // ── Step 1: Identify the aircraft with Claude ─────────────
+    const planeData = await askClaude(imageBase64, mediaType);
+
+    // ── Step 2: Look up live flight data if we have a tail number
+    // Only try if: tail number is not empty AND FlightAware key is configured
+    const hasTailNumber = planeData.tail_number && planeData.tail_number.trim() !== '';
+    const hasFlightAwareKey = !!process.env.FLIGHTAWARE_API_KEY;
+
+    let flightData = null;
+    if (hasTailNumber && hasFlightAwareKey) {
+      flightData = await getFlightData(planeData.tail_number);
+    }
+
+    // ── Step 3: Merge and send back to browser ────────────────
+    // flightData will be an object if found, or null if not
+    planeData.flight = flightData;
+
+    res.json(planeData);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };

@@ -271,6 +271,52 @@ header h1 {
   line-height: 1.4;
 }
 
+/* ── Live Flight section ──────────────────────────────────── */
+#flightSection {
+  border-top: 1px solid #334155;
+}
+
+.flight-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.9rem 1.25rem 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #4ade80;   /* green — "live" feeling */
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Pulsing green dot to indicate "live" */
+.flight-dot {
+  width: 8px;
+  height: 8px;
+  background: #4ade80;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.8); }
+}
+
+/* Status badge colours */
+.status-enroute  { color: #4ade80; font-weight: 600; }
+.status-landed   { color: #94a3b8; }
+.status-delayed  { color: #fbbf24; font-weight: 600; }
+.status-other    { color: #cbd5e1; }
+
+/* "No flight found" message */
+.no-flight-msg {
+  padding: 1rem 1.25rem;
+  color: #475569;
+  font-size: 0.88rem;
+  border-top: 1px solid #334155;
+}
+
 /* ── History section ──────────────────────────────────────── */
 #historySection {
   margin-top: 1rem;

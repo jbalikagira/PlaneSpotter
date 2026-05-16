@@ -1,51 +1,27 @@
 // ============================================================
-// PlaneSpotter — server.js
-// A simple Express server with two jobs:
-//   1. Serve the frontend (index.html, style.css, script.js)
-//   2. Accept a photo and ask Claude what plane it is
+// PlaneSpotter — server.js  (Phase 3)
+// Local development server.
+// On Vercel, api/identify.js handles the API route instead.
 // ============================================================
 
-// Load environment variables from .env file FIRST, before anything else
 require('dotenv').config();
 
 const express = require('express');
-const https   = require('https');  // Built into Node — no install needed
-const path    = require('path');   // Built into Node — helps with file paths
+const https   = require('https');
+const path    = require('path');
 
 const app  = express();
 const PORT = 3000;
 
-// ── Middleware ────────────────────────────────────────────────
-// Tell Express to parse incoming JSON bodies.
-// We increase the size limit because base64 images can be large.
 app.use(express.json({ limit: '50mb' }));
-
-// Serve static files (index.html, style.css, script.js) from the root folder.
 app.use(express.static(path.join(__dirname)));
 
-// ── Route 1: GET / ───────────────────────────────────────────
-// When someone visits http://localhost:3000 send them index.html
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// ── Route 2: POST /api/identify ──────────────────────────────
-// The browser sends { imageBase64: "...", mediaType: "image/jpeg" }
-// We forward it to Claude and send the result back.
-app.post('/api/identify', async (req, res) => {
-  const { imageBase64, mediaType } = req.body;
-
-  // Basic guard — make sure we actually received image data
-  if (!imageBase64) {
-    return res.status(400).json({ error: 'No image data received' });
-  }
-
-  // Make sure the API key is set
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not set in .env' });
-  }
-
-  // ── Build the message we'll send to Claude ─────────────────
+// ── Helper: call the Anthropic API ───────────────────────────
+function askClaude(imageBase64, mediaType) {
   const systemPrompt = `You are an expert aircraft identification system.
 When shown a photo, you MUST respond with ONLY valid JSON — no explanation, no prose, no markdown code fences.
 Return exactly this structure (fill in every field):
@@ -74,25 +50,15 @@ If the image does not appear to contain an aircraft, still return the JSON but s
         role: 'user',
         content: [
           {
-            // This is the "image content block" — tells Claude to look at a picture
             type: 'image',
-            source: {
-              type: 'base64',
-              media_type: mediaType || 'image/jpeg',
-              data: imageBase64,
-            },
+            source: { type: 'base64', media_type: mediaType || 'image/jpeg', data: imageBase64 },
           },
-          {
-            type: 'text',
-            text: 'What aircraft is in this photo? Respond with JSON only.',
-          },
+          { type: 'text', text: 'What aircraft is in this photo? Respond with JSON only.' },
         ],
       },
     ],
   });
 
-  // ── Call the Anthropic API over HTTPS ──────────────────────
-  // We use Node's built-in https module to keep dependencies minimal.
   const options = {
     hostname: 'api.anthropic.com',
     path: '/v1/messages',
@@ -105,70 +71,114 @@ If the image does not appear to contain an aircraft, still return the JSON but s
     },
   };
 
-  const anthropicRequest = https.request(options, (anthropicResponse) => {
-    let rawData = '';
-
-    // Collect the response chunks as they arrive
-    anthropicResponse.on('data', (chunk) => {
-      rawData += chunk;
-    });
-
-    // Once the full response is here, parse and forward it
-    anthropicResponse.on('end', () => {
-      try {
-        const parsed = JSON.parse(rawData);
-
-        // Check if the Anthropic API itself returned an error (e.g. rate limit, overload)
-        if (parsed.type === 'error') {
-          const apiErrorMsg = parsed.error && parsed.error.message
-            ? parsed.error.message
-            : 'Unknown Anthropic API error';
-          return res.status(500).json({ error: `Anthropic API error: ${apiErrorMsg}` });
-        }
-
-        // Claude's response text lives inside content[0].text
-        if (!parsed.content || !parsed.content[0] || !parsed.content[0].text) {
-          return res.status(500).json({ error: 'Unexpected response shape from Claude', raw: parsed });
-        }
-
-        const claudeText = parsed.content[0].text;
-
-        // Claude should have returned pure JSON — parse it
-        let planeData;
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (response) => {
+      let rawData = '';
+      response.on('data', (chunk) => { rawData += chunk; });
+      response.on('end', () => {
         try {
-          planeData = JSON.parse(claudeText);
-        } catch (jsonErr) {
-          // If Claude added any surrounding text, try to extract the JSON object
-          const match = claudeText.match(/\{[\s\S]*\}/);
-          if (match) {
-            planeData = JSON.parse(match[0]);
-          } else {
-            return res.status(500).json({ error: 'Claude did not return valid JSON', raw: claudeText });
+          const parsed = JSON.parse(rawData);
+          if (parsed.type === 'error') {
+            const msg = parsed.error && parsed.error.message ? parsed.error.message : 'Unknown API error';
+            return reject(new Error(`Anthropic API error: ${msg}`));
           }
+          if (!parsed.content || !parsed.content[0] || !parsed.content[0].text) {
+            return reject(new Error('Unexpected response shape from Claude'));
+          }
+          const claudeText = parsed.content[0].text;
+          let planeData;
+          try {
+            planeData = JSON.parse(claudeText);
+          } catch (e) {
+            const match = claudeText.match(/\{[\s\S]*\}/);
+            if (match) { planeData = JSON.parse(match[0]); }
+            else { return reject(new Error('Claude did not return valid JSON')); }
+          }
+          resolve(planeData);
+        } catch (err) {
+          reject(new Error('Failed to parse Claude response: ' + err.message));
         }
-
-        // Send the clean plane data back to the browser
-        res.json(planeData);
-
-      } catch (err) {
-        res.status(500).json({ error: 'Failed to parse Anthropic response', details: err.message });
-      }
+      });
     });
+    req.on('error', (err) => reject(new Error('Network error: ' + err.message)));
+    req.write(requestBody);
+    req.end();
   });
+}
 
-  // Handle network errors (e.g. no internet)
-  anthropicRequest.on('error', (err) => {
-    res.status(500).json({ error: 'Network error calling Anthropic API', details: err.message });
+// ── Helper: call FlightAware AeroAPI ─────────────────────────
+// Returns a flight info object, or null if nothing found.
+function getFlightData(tailNumber) {
+  const ident = tailNumber.trim().toUpperCase();
+
+  const options = {
+    hostname: 'aeroapi.flightaware.com',
+    path: `/aeroapi/flights/${encodeURIComponent(ident)}`,
+    method: 'GET',
+    headers: {
+      'x-apikey': process.env.FLIGHTAWARE_API_KEY,
+    },
+  };
+
+  return new Promise((resolve) => {
+    const req = https.request(options, (response) => {
+      let rawData = '';
+      response.on('data', (chunk) => { rawData += chunk; });
+      response.on('end', () => {
+        try {
+          const parsed = JSON.parse(rawData);
+          if (parsed.flights && parsed.flights.length > 0) {
+            const f = parsed.flights[0];
+            resolve({
+              origin:         f.origin      ? `${f.origin.city} (${f.origin.code_iata || f.origin.code})`           : 'Unknown',
+              destination:    f.destination ? `${f.destination.city} (${f.destination.code_iata || f.destination.code})` : 'Unknown',
+              departure_time: f.actual_out  || f.scheduled_out || null,
+              status:         f.status      || 'Unknown',
+              flight_number:  f.ident       || ident,
+            });
+          } else {
+            resolve(null);
+          }
+        } catch (e) {
+          resolve(null);
+        }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.end();
   });
+}
 
-  // Send the request body and close the connection
-  anthropicRequest.write(requestBody);
-  anthropicRequest.end();
+// ── Route: POST /api/identify ─────────────────────────────────
+app.post('/api/identify', async (req, res) => {
+  const { imageBase64, mediaType } = req.body;
+
+  if (!imageBase64) return res.status(400).json({ error: 'No image data received' });
+  if (!process.env.ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not set in .env' });
+
+  try {
+    // Step 1: Ask Claude to identify the aircraft
+    const planeData = await askClaude(imageBase64, mediaType);
+
+    // Step 2: If a tail number was spotted, look up live flight data
+    const hasTailNumber = planeData.tail_number && planeData.tail_number.trim() !== '';
+    const hasFlightAwareKey = !!process.env.FLIGHTAWARE_API_KEY;
+
+    let flightData = null;
+    if (hasTailNumber && hasFlightAwareKey) {
+      flightData = await getFlightData(planeData.tail_number);
+    }
+
+    // Step 3: Attach flight data and send everything back
+    planeData.flight = flightData;
+    res.json(planeData);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ── Start listening ───────────────────────────────────────────
-// When running locally (node server.js), start the server normally.
-// When running on Vercel, Vercel handles the port — we just export the app.
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`✈️  PlaneSpotter is running!`);
@@ -177,5 +187,4 @@ if (require.main === module) {
   });
 }
 
-// This line makes the app available to Vercel
 module.exports = app;

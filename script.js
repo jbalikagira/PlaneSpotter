@@ -1,5 +1,5 @@
 // ============================================================
-// PlaneSpotter — script.js  (Phase 2)
+// PlaneSpotter — script.js  (Phase 3)
 // New in this version:
 //   - localStorage history (save + display past identifications)
 //   - Low confidence warning instead of showing bad results
@@ -36,6 +36,15 @@ const specFeatures     = document.getElementById('specFeatures');
 const specTailNumber   = document.getElementById('specTailNumber');
 const specConfidence   = document.getElementById('specConfidence');
 const confidenceBar    = document.getElementById('confidenceBar');
+
+// Live flight elements
+const flightSection    = document.getElementById('flightSection');
+const noFlightSection  = document.getElementById('noFlightSection');
+const flightNumber     = document.getElementById('flightNumber');
+const flightOrigin     = document.getElementById('flightOrigin');
+const flightDestination= document.getElementById('flightDestination');
+const flightDeparture  = document.getElementById('flightDeparture');
+const flightStatus     = document.getElementById('flightStatus');
 
 // ── Constants ─────────────────────────────────────────────────
 // If Claude is less than 50% confident, we show a warning instead of results
@@ -226,6 +235,40 @@ function showResults(data) {
   if (data.confidence < 0.5)      confidenceBar.classList.add('low');
   else if (data.confidence < 0.75) confidenceBar.classList.add('medium');
   // else: default blue (high confidence)
+
+  // ── Live flight data ──────────────────────────────────────
+  // data.flight is either an object (found) or null (not found)
+  hide(flightSection);
+  hide(noFlightSection);
+
+  const hasTailNumber = data.tail_number && data.tail_number.trim() !== '';
+
+  if (hasTailNumber) {
+    if (data.flight) {
+      // We have live flight data — show it
+      flightNumber.textContent      = data.flight.flight_number || '—';
+      flightOrigin.textContent      = data.flight.origin        || '—';
+      flightDestination.textContent = data.flight.destination   || '—';
+      flightDeparture.textContent   = data.flight.departure_time
+        ? new Date(data.flight.departure_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+        : '—';
+
+      // Colour the status text based on what it says
+      const statusText = data.flight.status || 'Unknown';
+      flightStatus.textContent  = statusText;
+      flightStatus.className    = ''; // clear old classes
+      if (statusText.toLowerCase().includes('route'))   flightStatus.classList.add('status-enroute');
+      else if (statusText.toLowerCase().includes('land')) flightStatus.classList.add('status-landed');
+      else if (statusText.toLowerCase().includes('delay')) flightStatus.classList.add('status-delayed');
+      else flightStatus.classList.add('status-other');
+
+      show(flightSection);
+    } else {
+      // Tail number was found but no flight data
+      show(noFlightSection);
+    }
+  }
+  // If no tail number visible at all, we show nothing for flight data
 
   show(resultsCard);
 }

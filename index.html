@@ -91,6 +91,28 @@
           </tbody>
         </table>
 
+        <!-- Live Flight section — shown only when FlightAware returns data -->
+        <div id="flightSection" class="hidden">
+          <div class="flight-header">
+            <span class="flight-dot"></span>
+            Live Flight Data
+          </div>
+          <table class="specs-table">
+            <tbody>
+              <tr><th>Flight</th>      <td id="flightNumber"></td></tr>
+              <tr><th>From</th>        <td id="flightOrigin"></td></tr>
+              <tr><th>To</th>          <td id="flightDestination"></td></tr>
+              <tr><th>Departed</th>    <td id="flightDeparture"></td></tr>
+              <tr><th>Status</th>      <td id="flightStatus"></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Shown when tail number was found but no flight data available -->
+        <div id="noFlightSection" class="hidden">
+          <p class="no-flight-msg">📡 No recent flight found for this registration.</p>
+        </div>
+
       </div><!-- /resultsCard -->
 
     </main>
