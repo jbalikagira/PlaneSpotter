@@ -1,122 +1,165 @@
 // ============================================================
-// PlaneSpotter — script.js
-// Runs in the browser. Handles:
-//   1. Button click → open camera / file picker
-//   2. Image selected → show preview + start upload
-//   3. Upload → show spinner → get result → show results card
+// PlaneSpotter — script.js  (Phase 2)
+// New in this version:
+//   - localStorage history (save + display past identifications)
+//   - Low confidence warning instead of showing bad results
+//   - Better error messages (offline detection, etc.)
+//   - Try Again button resets the UI
 // ============================================================
 
-// ── Grab references to every HTML element we'll touch ────────
-const identifyBtn    = document.getElementById('identifyBtn');
-const imageInput     = document.getElementById('imageInput');
-const previewSection = document.getElementById('previewSection');
-const previewImage   = document.getElementById('previewImage');
-const loadingSection = document.getElementById('loadingSection');
-const errorSection   = document.getElementById('errorSection');
-const errorMessage   = document.getElementById('errorMessage');
-const resultsCard    = document.getElementById('resultsCard');
+// ── Grab all HTML elements we'll touch ───────────────────────
+const identifyBtn          = document.getElementById('identifyBtn');
+const imageInput           = document.getElementById('imageInput');
+const previewSection       = document.getElementById('previewSection');
+const previewImage         = document.getElementById('previewImage');
+const loadingSection       = document.getElementById('loadingSection');
+const errorSection         = document.getElementById('errorSection');
+const errorMessage         = document.getElementById('errorMessage');
+const lowConfidenceSection = document.getElementById('lowConfidenceSection');
+const lowConfidenceMessage = document.getElementById('lowConfidenceMessage');
+const resultsCard          = document.getElementById('resultsCard');
+const historySection       = document.getElementById('historySection');
+const historyGrid          = document.getElementById('historyGrid');
+const clearHistoryBtn      = document.getElementById('clearHistoryBtn');
 
 // Results card fields
-const aircraftName    = document.getElementById('aircraftName');
-const roleText        = document.getElementById('roleText');
+const aircraftName     = document.getElementById('aircraftName');
+const roleText         = document.getElementById('roleText');
 const specManufacturer = document.getElementById('specManufacturer');
-const specLength      = document.getElementById('specLength');
-const specWingspan    = document.getElementById('specWingspan');
-const specSpeed       = document.getElementById('specSpeed');
-const specRange       = document.getElementById('specRange');
-const specPassengers  = document.getElementById('specPassengers');
-const specFirstFlight = document.getElementById('specFirstFlight');
-const specFeatures    = document.getElementById('specFeatures');
-const specTailNumber  = document.getElementById('specTailNumber');
-const specConfidence  = document.getElementById('specConfidence');
+const specLength       = document.getElementById('specLength');
+const specWingspan     = document.getElementById('specWingspan');
+const specSpeed        = document.getElementById('specSpeed');
+const specRange        = document.getElementById('specRange');
+const specPassengers   = document.getElementById('specPassengers');
+const specFirstFlight  = document.getElementById('specFirstFlight');
+const specFeatures     = document.getElementById('specFeatures');
+const specTailNumber   = document.getElementById('specTailNumber');
+const specConfidence   = document.getElementById('specConfidence');
+const confidenceBar    = document.getElementById('confidenceBar');
 
-// ── Step 1: Button click → trigger the hidden file input ─────
-// We keep the real input hidden because it's ugly.
-// Our nice button just "clicks" the input on behalf of the user.
+// ── Constants ─────────────────────────────────────────────────
+// If Claude is less than 50% confident, we show a warning instead of results
+const LOW_CONFIDENCE_THRESHOLD = 0.50;
+
+// Key we use to store history in localStorage
+const HISTORY_KEY = 'planespotter_history';
+
+// Maximum number of history items to keep
+const MAX_HISTORY = 20;
+
+// ── On page load: show any saved history ─────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  renderHistory();
+});
+
+// ── Button click → open file picker / camera ─────────────────
 identifyBtn.addEventListener('click', () => {
   imageInput.click();
 });
 
-// ── Step 2: User picked a photo ───────────────────────────────
+// ── "Try Again" buttons → reset the UI ───────────────────────
+document.getElementById('tryAgainBtn').addEventListener('click', resetUI);
+document.getElementById('tryAgainBtn2').addEventListener('click', resetUI);
+
+// ── Clear history button ──────────────────────────────────────
+clearHistoryBtn.addEventListener('click', () => {
+  localStorage.removeItem(HISTORY_KEY);
+  renderHistory();
+});
+
+// ── User picked a photo ───────────────────────────────────────
 imageInput.addEventListener('change', (event) => {
   const file = event.target.files[0];
-
-  // If they cancelled the picker, do nothing
   if (!file) return;
 
-  // Show a preview of the selected photo
+  // Show preview
   const objectURL = URL.createObjectURL(file);
   previewImage.src = objectURL;
   show(previewSection);
 
-  // Start the identification process
+  // Start identification
   identifyPlane(file);
 
-  // Reset the input so the user can pick the same photo again later
+  // Reset so the same photo can be picked again
   imageInput.value = '';
 });
 
-// ── Step 3: The main identification function ─────────────────
+// ── Main identification function ──────────────────────────────
 async function identifyPlane(file) {
-  // Hide old results / errors, show spinner
   hide(resultsCard);
   hide(errorSection);
+  hide(lowConfidenceSection);
   show(loadingSection);
 
   try {
-    // Convert the image file to base64 text.
-    // base64 is a way to turn binary (image) data into plain text
-    // so we can send it in a JSON body.
-    const { base64Data, mediaType } = await fileToBase64(file);
+    // Resize + convert to base64
+    const { base64Data, mediaType, thumbnailDataUrl } = await fileToBase64(file);
 
-    // Send the image to our own server (which will forward it to Claude)
+    // Check for internet before trying
+    if (!navigator.onLine) {
+      throw new Error('You appear to be offline. Please check your internet connection and try again.');
+    }
+
+    // Send to our server
     const response = await fetch('/api/identify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        imageBase64: base64Data,
-        mediaType: mediaType,
-      }),
+      body: JSON.stringify({ imageBase64: base64Data, mediaType }),
     });
 
-    // Parse the JSON response from the server
     const data = await response.json();
 
     if (!response.ok) {
-      // Server returned an error (4xx or 5xx status)
-      throw new Error(data.error || 'Server error');
+      throw new Error(data.error || 'Server returned an error. Please try again.');
     }
 
-    // Success! Show the results
     hide(loadingSection);
+
+    // ── Low confidence check ──────────────────────────────────
+    // If Claude isn't sure this is a plane, show a friendly warning
+    if (data.confidence < LOW_CONFIDENCE_THRESHOLD) {
+      lowConfidenceMessage.textContent =
+        `I'm not confident this is an aircraft (${Math.round(data.confidence * 100)}% sure). ` +
+        `Try a clearer photo with the whole plane visible, or a different angle.`;
+      show(lowConfidenceSection);
+      return; // Don't show results or save to history
+    }
+
+    // ── Show results ──────────────────────────────────────────
     showResults(data);
 
+    // ── Save to history ───────────────────────────────────────
+    saveToHistory(data, thumbnailDataUrl);
+    renderHistory();
+
   } catch (err) {
-    // Something went wrong — show the error to the user
     hide(loadingSection);
-    showError(err.message || 'Something went wrong. Please try again.');
+
+    // Give a friendly message for common problems
+    let friendlyMessage = err.message;
+    if (err.message.includes('fetch') || err.message.includes('NetworkError') || err.message.includes('Failed to fetch')) {
+      friendlyMessage = 'Could not reach the server. Are you offline, or is the server running?';
+    }
+
+    showError(friendlyMessage);
   }
 }
 
-// ── Helper: Convert a File object to base64, resizing if too large ───
-// The Anthropic API has a 5MB image limit.
-// We resize anything large down to max 1600px on its longest side before sending.
-// Returns a promise that resolves to { base64Data, mediaType }
+// ── Helper: resize image and convert to base64 ───────────────
+// Also returns a small thumbnail data URL for the history display
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
     reader.onload = () => {
-      const fullDataUrl = reader.result;
-
-      // Create an Image element to get the dimensions
       const img = new Image();
+
       img.onload = () => {
-        const MAX_SIZE = 1600; // max pixels on the longest side
+        // ── Full-size (resized) version for Claude ────────────
+        const MAX_SIZE = 1600;
         let width  = img.width;
         let height = img.height;
 
-        // Only resize if the image is bigger than our limit
         if (width > MAX_SIZE || height > MAX_SIZE) {
           if (width > height) {
             height = Math.round((height / width) * MAX_SIZE);
@@ -127,23 +170,31 @@ function fileToBase64(file) {
           }
         }
 
-        // Draw the (possibly resized) image onto a canvas
         const canvas = document.createElement('canvas');
         canvas.width  = width;
         canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Export as JPEG at 85% quality — keeps size small, quality good
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
         const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        const commaIndex     = resizedDataUrl.indexOf(',');
-        const base64Data     = resizedDataUrl.slice(commaIndex + 1);
+        const base64Data     = resizedDataUrl.split(',')[1];
 
-        resolve({ base64Data, mediaType: 'image/jpeg' });
+        // ── Small thumbnail for history display ───────────────
+        // We keep this tiny (200×200) so localStorage doesn't fill up
+        const THUMB = 200;
+        let tw = img.width, th = img.height;
+        if (tw > th) { th = Math.round((th / tw) * THUMB); tw = THUMB; }
+        else         { tw = Math.round((tw / th) * THUMB); th = THUMB; }
+
+        const thumbCanvas = document.createElement('canvas');
+        thumbCanvas.width  = tw;
+        thumbCanvas.height = th;
+        thumbCanvas.getContext('2d').drawImage(img, 0, 0, tw, th);
+        const thumbnailDataUrl = thumbCanvas.toDataURL('image/jpeg', 0.6);
+
+        resolve({ base64Data, mediaType: 'image/jpeg', thumbnailDataUrl });
       };
 
-      img.onerror = () => reject(new Error('Failed to load image for resizing'));
-      img.src = fullDataUrl;
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = reader.result;
     };
 
     reader.onerror = () => reject(new Error('Failed to read image file'));
@@ -151,36 +202,156 @@ function fileToBase64(file) {
   });
 }
 
-// ── Helper: Populate and show the results card ───────────────
+// ── Helper: fill in and show the results card ─────────────────
 function showResults(data) {
-  // Fill in every field from Claude's JSON response
-  aircraftName.textContent     = data.aircraft_type    || 'Unknown Aircraft';
-  roleText.textContent         = data.role             || '';
-  specManufacturer.textContent = data.manufacturer     || '—';
-  specLength.textContent       = data.length_m         ? `${data.length_m} m` : '—';
-  specWingspan.textContent     = data.wingspan_m       ? `${data.wingspan_m} m` : '—';
-  specSpeed.textContent        = data.max_speed_kmh    ? `${data.max_speed_kmh} km/h` : '—';
-  specRange.textContent        = data.range_km         ? `${data.range_km} km` : '—';
+  aircraftName.textContent     = data.aircraft_type     || 'Unknown Aircraft';
+  roleText.textContent         = data.role              || '';
+  specManufacturer.textContent = data.manufacturer      || '—';
+  specLength.textContent       = data.length_m          ? `${data.length_m} m`      : '—';
+  specWingspan.textContent     = data.wingspan_m        ? `${data.wingspan_m} m`    : '—';
+  specSpeed.textContent        = data.max_speed_kmh     ? `${data.max_speed_kmh} km/h` : '—';
+  specRange.textContent        = data.range_km          ? `${data.range_km} km`     : '—';
   specPassengers.textContent   = data.passenger_capacity || '—';
   specFirstFlight.textContent  = data.first_flight_year || '—';
   specFeatures.textContent     = data.notable_features  || '—';
   specTailNumber.textContent   = data.tail_number       || 'Not visible';
 
-  // Convert confidence (0–1) to a percentage, e.g. 0.92 → "92%"
-  const confidencePct = data.confidence != null
-    ? `${Math.round(data.confidence * 100)}%`
-    : '—';
-  specConfidence.textContent = confidencePct;
+  // Confidence bar
+  const pct = data.confidence != null ? Math.round(data.confidence * 100) : 0;
+  specConfidence.textContent = `${pct}%`;
+  confidenceBar.style.width  = `${pct}%`;
+
+  // Colour the bar based on confidence level
+  confidenceBar.classList.remove('low', 'medium');
+  if (data.confidence < 0.5)      confidenceBar.classList.add('low');
+  else if (data.confidence < 0.75) confidenceBar.classList.add('medium');
+  // else: default blue (high confidence)
 
   show(resultsCard);
 }
 
-// ── Helper: Show an error message ────────────────────────────
+// ── Helper: show error message ────────────────────────────────
 function showError(message) {
   errorMessage.textContent = '⚠️ ' + message;
   show(errorSection);
 }
 
-// ── Tiny utilities to show/hide elements ─────────────────────
+// ── Helper: reset to initial state ───────────────────────────
+function resetUI() {
+  hide(errorSection);
+  hide(lowConfidenceSection);
+  hide(resultsCard);
+  hide(previewSection);
+  hide(loadingSection);
+}
+
+// ── localStorage history helpers ──────────────────────────────
+
+// Save one identification to localStorage
+function saveToHistory(data, thumbnailDataUrl) {
+  const history = loadHistory();
+
+  // Build a history entry
+  const entry = {
+    id:           Date.now(),                    // unique ID = timestamp in milliseconds
+    timestamp:    new Date().toISOString(),       // e.g. "2025-05-16T19:30:00.000Z"
+    aircraft_type: data.aircraft_type || 'Unknown',
+    confidence:   data.confidence,
+    thumbnail:    thumbnailDataUrl,              // small JPEG data URL
+    data:         data,                          // full result for re-opening
+  };
+
+  // Add to the front of the array (newest first)
+  history.unshift(entry);
+
+  // Keep only the most recent MAX_HISTORY items
+  if (history.length > MAX_HISTORY) {
+    history.splice(MAX_HISTORY);
+  }
+
+  // Save back to localStorage
+  // localStorage only stores strings, so we convert to JSON text
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch (e) {
+    // localStorage can be full (rare) — silently ignore
+    console.warn('Could not save to history:', e);
+  }
+}
+
+// Load history array from localStorage
+function loadHistory() {
+  try {
+    const stored = localStorage.getItem(HISTORY_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+// Render the history grid from localStorage
+function renderHistory() {
+  const history = loadHistory();
+
+  if (history.length === 0) {
+    hide(historySection);
+    return;
+  }
+
+  show(historySection);
+  historyGrid.innerHTML = ''; // clear old items
+
+  history.forEach((entry) => {
+    // Create the card element
+    const item = document.createElement('div');
+    item.className = 'history-item';
+
+    // Format the time nicely, e.g. "Today 19:30" or "15 May 19:30"
+    const timeLabel = formatTime(entry.timestamp);
+
+    item.innerHTML = `
+      <img src="${entry.thumbnail}" alt="${entry.aircraft_type}" loading="lazy" />
+      <div class="history-item-info">
+        <div class="history-item-name">${entry.aircraft_type}</div>
+        <div class="history-item-time">${timeLabel}</div>
+      </div>
+    `;
+
+    // Clicking a history item re-shows its results
+    item.addEventListener('click', () => {
+      // Show the thumbnail as the preview
+      previewImage.src = entry.thumbnail;
+      show(previewSection);
+
+      // Re-show the results
+      hide(errorSection);
+      hide(lowConfidenceSection);
+      showResults(entry.data);
+
+      // Scroll up so the user can see the results
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    historyGrid.appendChild(item);
+  });
+}
+
+// ── Helper: format a timestamp into a readable label ─────────
+function formatTime(isoString) {
+  const date  = new Date(isoString);
+  const now   = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (isToday) {
+    return `Today ${timeStr}`;
+  } else {
+    const dateStr = date.toLocaleDateString([], { day: 'numeric', month: 'short' });
+    return `${dateStr} ${timeStr}`;
+  }
+}
+
+// ── Tiny show/hide utilities ──────────────────────────────────
 function show(el) { el.classList.remove('hidden'); }
 function hide(el) { el.classList.add('hidden'); }

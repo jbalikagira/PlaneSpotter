@@ -1,6 +1,6 @@
 /* ============================================================
-   PlaneSpotter — style.css
-   Clean, mobile-first design. Works on phones and desktop.
+   PlaneSpotter — style.css  (Phase 2)
+   Clean dark UI, mobile-first, smooth animations
    ============================================================ */
 
 /* ── Reset & base ─────────────────────────────────────────── */
@@ -12,10 +12,10 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #0f172a;   /* dark navy */
+  background: #0f172a;
   color: #e2e8f0;
   min-height: 100vh;
-  padding: 1rem;
+  padding: 1rem 1rem 3rem;
 }
 
 /* ── Layout ───────────────────────────────────────────────── */
@@ -33,13 +33,14 @@ header {
 header h1 {
   font-size: 2rem;
   font-weight: 700;
-  color: #38bdf8;   /* sky blue */
+  color: #38bdf8;
+  letter-spacing: -0.5px;
 }
 
 .tagline {
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 0.4rem;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
 /* ── Big button ───────────────────────────────────────────── */
@@ -47,30 +48,31 @@ header h1 {
   display: block;
   width: 100%;
   padding: 1.2rem;
-  margin: 1.5rem 0;
-  font-size: 1.2rem;
+  margin: 0 0 1.5rem;
+  font-size: 1.15rem;
   font-weight: 600;
-  background: #0ea5e9;   /* bright blue */
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
   color: #fff;
   border: none;
-  border-radius: 12px;
+  border-radius: 14px;
   cursor: pointer;
-  transition: background 0.2s, transform 0.1s;
+  transition: opacity 0.2s, transform 0.1s;
+  box-shadow: 0 4px 20px rgba(14, 165, 233, 0.3);
 }
 
-.big-button:hover  { background: #0284c7; }
+.big-button:hover  { opacity: 0.9; }
 .big-button:active { transform: scale(0.98); }
 
 /* ── Photo preview ────────────────────────────────────────── */
 #previewSection {
-  margin: 1rem 0;
+  margin-bottom: 1rem;
   text-align: center;
 }
 
 #previewImage {
   max-width: 100%;
-  max-height: 300px;
-  border-radius: 12px;
+  max-height: 280px;
+  border-radius: 14px;
   object-fit: contain;
   border: 2px solid #1e293b;
 }
@@ -79,17 +81,22 @@ header h1 {
 #loadingSection {
   text-align: center;
   padding: 2rem;
-  color: #94a3b8;
+  color: #64748b;
+}
+
+#loadingSection p {
+  margin-top: 0.75rem;
+  font-size: 0.95rem;
 }
 
 .spinner {
-  width: 48px;
-  height: 48px;
-  border: 5px solid #1e293b;
+  width: 44px;
+  height: 44px;
+  border: 4px solid #1e293b;
   border-top-color: #38bdf8;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin: 0 auto 1rem;
+  animation: spin 0.75s linear infinite;
+  margin: 0 auto;
 }
 
 @keyframes spin {
@@ -98,64 +105,254 @@ header h1 {
 
 /* ── Error box ────────────────────────────────────────────── */
 #errorSection {
-  background: #450a0a;
-  border: 1px solid #dc2626;
-  border-radius: 10px;
-  padding: 1rem;
+  background: #1c0a0a;
+  border: 1px solid #7f1d1d;
+  border-radius: 12px;
+  padding: 1.25rem;
   color: #fca5a5;
-  margin: 1rem 0;
+  margin-bottom: 1rem;
   text-align: center;
 }
+
+#errorSection p {
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+/* ── Low confidence warning ───────────────────────────────── */
+#lowConfidenceSection {
+  background: #1c1500;
+  border: 1px solid #854d0e;
+  border-radius: 12px;
+  padding: 1.5rem;
+  color: #fde68a;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.low-confidence-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+#lowConfidenceSection p:not(.low-confidence-icon) {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+/* ── Try Again button (used in error + low confidence) ───── */
+.try-again-btn {
+  background: transparent;
+  border: 1px solid currentColor;
+  color: inherit;
+  padding: 0.5rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  opacity: 0.85;
+  transition: opacity 0.2s;
+}
+
+.try-again-btn:hover { opacity: 1; }
 
 /* ── Results card ─────────────────────────────────────────── */
 #resultsCard {
   background: #1e293b;
   border: 1px solid #334155;
   border-radius: 16px;
-  padding: 1.5rem;
-  margin: 1.5rem 0;
+  overflow: hidden;
+  margin-bottom: 2rem;
+  /* Slide-in animation when it appears */
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Result header (name + role) ──────────────────────────── */
+.result-header {
+  padding: 1.25rem 1.25rem 1rem;
+  border-bottom: 1px solid #334155;
 }
 
 #aircraftName {
-  font-size: 1.4rem;
+  font-size: 1.35rem;
   font-weight: 700;
   color: #38bdf8;
-  margin-bottom: 0.3rem;
+  line-height: 1.2;
 }
 
 .role {
-  color: #94a3b8;
-  font-size: 0.9rem;
-  margin-bottom: 1.2rem;
+  color: #64748b;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
 }
+
+/* ── Confidence bar ───────────────────────────────────────── */
+.confidence-section {
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid #334155;
+}
+
+.confidence-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  color: #64748b;
+  margin-bottom: 0.4rem;
+}
+
+#specConfidence {
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.confidence-bar-track {
+  height: 6px;
+  background: #0f172a;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.confidence-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+  transition: width 0.6s ease;
+  width: 0%; /* set by JS */
+}
+
+/* Colour the bar red when confidence is low */
+.confidence-bar-fill.low   { background: linear-gradient(90deg, #dc2626, #f87171); }
+.confidence-bar-fill.medium { background: linear-gradient(90deg, #d97706, #fbbf24); }
 
 /* ── Specs table ──────────────────────────────────────────── */
 .specs-table {
   width: 100%;
   border-collapse: collapse;
+  padding: 0 1.25rem;
+  display: table; /* override any inherited block */
+}
+
+/* Add horizontal padding to the table rows */
+.specs-table th,
+.specs-table td {
+  padding: 0.65rem 1.25rem;
 }
 
 .specs-table tr {
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #1e293b;
 }
 
 .specs-table tr:last-child {
   border-bottom: none;
 }
 
+/* Alternate row shading for readability */
+.specs-table tbody tr:nth-child(even) {
+  background: rgba(255,255,255,0.02);
+}
+
 .specs-table th {
   text-align: left;
-  padding: 0.6rem 0.4rem 0.6rem 0;
   font-weight: 500;
-  color: #94a3b8;
-  width: 45%;
-  font-size: 0.9rem;
+  color: #64748b;
+  width: 42%;
+  font-size: 0.85rem;
 }
 
 .specs-table td {
-  padding: 0.6rem 0;
-  color: #e2e8f0;
-  font-size: 0.95rem;
+  color: #cbd5e1;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+/* ── History section ──────────────────────────────────────── */
+#historySection {
+  margin-top: 1rem;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.history-header h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.clear-btn {
+  background: transparent;
+  border: 1px solid #334155;
+  color: #64748b;
+  padding: 0.3rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.clear-btn:hover {
+  color: #f87171;
+  border-color: #f87171;
+}
+
+/* ── History grid ─────────────────────────────────────────── */
+#historyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.75rem;
+}
+
+/* Each history card */
+.history-item {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s;
+}
+
+.history-item:hover {
+  border-color: #38bdf8;
+  transform: translateY(-2px);
+}
+
+.history-item img {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  display: block;
+}
+
+.history-item-info {
+  padding: 0.4rem 0.5rem 0.5rem;
+}
+
+.history-item-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-item-time {
+  font-size: 0.68rem;
+  color: #475569;
+  margin-top: 0.1rem;
 }
 
 /* ── Utility ──────────────────────────────────────────────── */

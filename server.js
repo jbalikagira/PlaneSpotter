@@ -168,8 +168,15 @@ If the image does not appear to contain an aircraft, still return the JSON but s
 });
 
 // ── Start listening ───────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`✈️  PlaneSpotter is running!`);
-  console.log(`   Local:   http://localhost:${PORT}`);
-  console.log(`   Network: check your IP address to test on your phone`);
-});
+// When running locally (node server.js), start the server normally.
+// When running on Vercel, Vercel handles the port — we just export the app.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`✈️  PlaneSpotter is running!`);
+    console.log(`   Local:   http://localhost:${PORT}`);
+    console.log(`   Network: check your IP address to test on your phone`);
+  });
+}
+
+// This line makes the app available to Vercel
+module.exports = app;

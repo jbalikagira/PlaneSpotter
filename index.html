@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <!-- This meta tag makes the page scale correctly on phones -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PlaneSpotter ✈️</title>
   <link rel="stylesheet" href="style.css" />
@@ -20,12 +19,7 @@
     <!-- ── Main action area ─────────────────────── -->
     <main>
 
-      <!--
-        The hidden file input does the real work.
-        accept="image/*"       → only let the user pick images
-        capture="environment"  → on phones, opens the REAR camera directly
-                                 on desktop, opens a normal file picker
-      -->
+      <!-- Hidden file input — opens camera on phone, file picker on desktop -->
       <input
         type="file"
         id="imageInput"
@@ -34,17 +28,17 @@
         style="display: none;"
       />
 
-      <!-- Big visible button — clicking it triggers the hidden input -->
+      <!-- Big visible button -->
       <button id="identifyBtn" class="big-button">
         📷 Identify a Plane
       </button>
 
-      <!-- Preview of the photo the user picked -->
+      <!-- Photo preview -->
       <div id="previewSection" class="hidden">
         <img id="previewImage" src="" alt="Your photo" />
       </div>
 
-      <!-- Loading spinner shown while we wait for Claude -->
+      <!-- Loading spinner -->
       <div id="loadingSection" class="hidden">
         <div class="spinner"></div>
         <p>Analysing aircraft…</p>
@@ -53,34 +47,68 @@
       <!-- Error message box -->
       <div id="errorSection" class="hidden">
         <p id="errorMessage"></p>
+        <button id="tryAgainBtn" class="try-again-btn">Try Again</button>
       </div>
 
-      <!-- Results card — hidden until we have data -->
-      <div id="resultsCard" class="hidden">
-        <h2 id="aircraftName"></h2>
-        <p id="roleText" class="role"></p>
+      <!-- Low confidence warning (not sure it's a plane) -->
+      <div id="lowConfidenceSection" class="hidden">
+        <p class="low-confidence-icon">🤔</p>
+        <p id="lowConfidenceMessage"></p>
+        <button id="tryAgainBtn2" class="try-again-btn">Try Another Photo</button>
+      </div>
 
+      <!-- Results card -->
+      <div id="resultsCard" class="hidden">
+
+        <!-- Aircraft name and role -->
+        <div class="result-header">
+          <h2 id="aircraftName"></h2>
+          <p id="roleText" class="role"></p>
+        </div>
+
+        <!-- Confidence bar -->
+        <div class="confidence-section">
+          <div class="confidence-label">
+            <span>Confidence</span>
+            <span id="specConfidence"></span>
+          </div>
+          <div class="confidence-bar-track">
+            <div id="confidenceBar" class="confidence-bar-fill"></div>
+          </div>
+        </div>
+
+        <!-- Specs table -->
         <table class="specs-table">
           <tbody>
-            <tr><th>Manufacturer</th>    <td id="specManufacturer"></td></tr>
-            <tr><th>Length</th>          <td id="specLength"></td></tr>
-            <tr><th>Wingspan</th>        <td id="specWingspan"></td></tr>
-            <tr><th>Max Speed</th>       <td id="specSpeed"></td></tr>
-            <tr><th>Range</th>           <td id="specRange"></td></tr>
-            <tr><th>Passengers</th>      <td id="specPassengers"></td></tr>
-            <tr><th>First Flight</th>    <td id="specFirstFlight"></td></tr>
-            <tr><th>Notable Features</th><td id="specFeatures"></td></tr>
-            <tr><th>Tail Number</th>     <td id="specTailNumber"></td></tr>
-            <tr><th>Confidence</th>      <td id="specConfidence"></td></tr>
+            <tr><th>Manufacturer</th>     <td id="specManufacturer"></td></tr>
+            <tr><th>Length</th>           <td id="specLength"></td></tr>
+            <tr><th>Wingspan</th>         <td id="specWingspan"></td></tr>
+            <tr><th>Max Speed</th>        <td id="specSpeed"></td></tr>
+            <tr><th>Range</th>            <td id="specRange"></td></tr>
+            <tr><th>Passengers</th>       <td id="specPassengers"></td></tr>
+            <tr><th>First Flight</th>     <td id="specFirstFlight"></td></tr>
+            <tr><th>Notable Features</th> <td id="specFeatures"></td></tr>
+            <tr><th>Tail Number</th>      <td id="specTailNumber"></td></tr>
           </tbody>
         </table>
-      </div>
+
+      </div><!-- /resultsCard -->
 
     </main>
 
+    <!-- ── History section ──────────────────────── -->
+    <!-- This sits below main and shows past identifications -->
+    <section id="historySection" class="hidden">
+      <div class="history-header">
+        <h3>Recent Identifications</h3>
+        <button id="clearHistoryBtn" class="clear-btn">Clear</button>
+      </div>
+      <!-- History items are injected here by script.js -->
+      <div id="historyGrid"></div>
+    </section>
+
   </div><!-- /container -->
 
-  <!-- Load our JavaScript last so the HTML is ready when it runs -->
   <script src="script.js"></script>
 
 </body>
