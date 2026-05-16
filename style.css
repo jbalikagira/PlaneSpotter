@@ -1,0 +1,164 @@
+/* ============================================================
+   PlaneSpotter — style.css
+   Clean, mobile-first design. Works on phones and desktop.
+   ============================================================ */
+
+/* ── Reset & base ─────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0f172a;   /* dark navy */
+  color: #e2e8f0;
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+/* ── Layout ───────────────────────────────────────────────── */
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ── Header ───────────────────────────────────────────────── */
+header {
+  text-align: center;
+  padding: 2rem 0 1.5rem;
+}
+
+header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #38bdf8;   /* sky blue */
+}
+
+.tagline {
+  color: #94a3b8;
+  margin-top: 0.4rem;
+  font-size: 0.95rem;
+}
+
+/* ── Big button ───────────────────────────────────────────── */
+.big-button {
+  display: block;
+  width: 100%;
+  padding: 1.2rem;
+  margin: 1.5rem 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  background: #0ea5e9;   /* bright blue */
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.big-button:hover  { background: #0284c7; }
+.big-button:active { transform: scale(0.98); }
+
+/* ── Photo preview ────────────────────────────────────────── */
+#previewSection {
+  margin: 1rem 0;
+  text-align: center;
+}
+
+#previewImage {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: 12px;
+  object-fit: contain;
+  border: 2px solid #1e293b;
+}
+
+/* ── Spinner ──────────────────────────────────────────────── */
+#loadingSection {
+  text-align: center;
+  padding: 2rem;
+  color: #94a3b8;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 5px solid #1e293b;
+  border-top-color: #38bdf8;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Error box ────────────────────────────────────────────── */
+#errorSection {
+  background: #450a0a;
+  border: 1px solid #dc2626;
+  border-radius: 10px;
+  padding: 1rem;
+  color: #fca5a5;
+  margin: 1rem 0;
+  text-align: center;
+}
+
+/* ── Results card ─────────────────────────────────────────── */
+#resultsCard {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+}
+
+#aircraftName {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #38bdf8;
+  margin-bottom: 0.3rem;
+}
+
+.role {
+  color: #94a3b8;
+  font-size: 0.9rem;
+  margin-bottom: 1.2rem;
+}
+
+/* ── Specs table ──────────────────────────────────────────── */
+.specs-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.specs-table tr {
+  border-bottom: 1px solid #334155;
+}
+
+.specs-table tr:last-child {
+  border-bottom: none;
+}
+
+.specs-table th {
+  text-align: left;
+  padding: 0.6rem 0.4rem 0.6rem 0;
+  font-weight: 500;
+  color: #94a3b8;
+  width: 45%;
+  font-size: 0.9rem;
+}
+
+.specs-table td {
+  padding: 0.6rem 0;
+  color: #e2e8f0;
+  font-size: 0.95rem;
+}
+
+/* ── Utility ──────────────────────────────────────────────── */
+.hidden {
+  display: none !important;
+}

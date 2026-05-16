@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- This meta tag makes the page scale correctly on phones -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PlaneSpotter ✈️</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- ── Header ──────────────────────────────── -->
+    <header>
+      <h1>✈️ PlaneSpotter</h1>
+      <p class="tagline">Tap the button, take a photo, identify any aircraft instantly.</p>
+    </header>
+
+    <!-- ── Main action area ─────────────────────── -->
+    <main>
+
+      <!--
+        The hidden file input does the real work.
+        accept="image/*"       → only let the user pick images
+        capture="environment"  → on phones, opens the REAR camera directly
+                                 on desktop, opens a normal file picker
+      -->
+      <input
+        type="file"
+        id="imageInput"
+        accept="image/*"
+        capture="environment"
+        style="display: none;"
+      />
+
+      <!-- Big visible button — clicking it triggers the hidden input -->
+      <button id="identifyBtn" class="big-button">
+        📷 Identify a Plane
+      </button>
+
+      <!-- Preview of the photo the user picked -->
+      <div id="previewSection" class="hidden">
+        <img id="previewImage" src="" alt="Your photo" />
+      </div>
+
+      <!-- Loading spinner shown while we wait for Claude -->
+      <div id="loadingSection" class="hidden">
+        <div class="spinner"></div>
+        <p>Analysing aircraft…</p>
+      </div>
+
+      <!-- Error message box -->
+      <div id="errorSection" class="hidden">
+        <p id="errorMessage"></p>
+      </div>
+
+      <!-- Results card — hidden until we have data -->
+      <div id="resultsCard" class="hidden">
+        <h2 id="aircraftName"></h2>
+        <p id="roleText" class="role"></p>
+
+        <table class="specs-table">
+          <tbody>
+            <tr><th>Manufacturer</th>    <td id="specManufacturer"></td></tr>
+            <tr><th>Length</th>          <td id="specLength"></td></tr>
+            <tr><th>Wingspan</th>        <td id="specWingspan"></td></tr>
+            <tr><th>Max Speed</th>       <td id="specSpeed"></td></tr>
+            <tr><th>Range</th>           <td id="specRange"></td></tr>
+            <tr><th>Passengers</th>      <td id="specPassengers"></td></tr>
+            <tr><th>First Flight</th>    <td id="specFirstFlight"></td></tr>
+            <tr><th>Notable Features</th><td id="specFeatures"></td></tr>
+            <tr><th>Tail Number</th>     <td id="specTailNumber"></td></tr>
+            <tr><th>Confidence</th>      <td id="specConfidence"></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </main>
+
+  </div><!-- /container -->
+
+  <!-- Load our JavaScript last so the HTML is ready when it runs -->
+  <script src="script.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Never commit your real secrets
+.env
+
+# Node.js dependencies folder (huge — npm install recreates it)
+node_modules/
+
+# macOS junk files
+.DS_Store
