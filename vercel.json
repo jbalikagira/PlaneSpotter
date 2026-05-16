@@ -1,11 +1,8 @@
 {
   "version": 2,
-  "functions": {
-    "server.js": {
-      "includeFiles": "public/**"
-    }
-  },
   "routes": [
-    { "src": "/(.*)", "dest": "/server.js" }
+    { "src": "/api/identify", "dest": "/api/identify.js" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }

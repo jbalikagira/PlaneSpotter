@@ -20,14 +20,13 @@ const PORT = 3000;
 // We increase the size limit because base64 images can be large.
 app.use(express.json({ limit: '50mb' }));
 
-// Serve everything in the /public folder as static files.
-// When the browser asks for /style.css, Express sends public/style.css automatically.
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files (index.html, style.css, script.js) from the root folder.
+app.use(express.static(path.join(__dirname)));
 
 // ── Route 1: GET / ───────────────────────────────────────────
 // When someone visits http://localhost:3000 send them index.html
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // ── Route 2: POST /api/identify ──────────────────────────────
